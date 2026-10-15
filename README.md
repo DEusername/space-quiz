@@ -13,6 +13,9 @@ JavaScript.
 
 Use `1` through `4` to select an answer and Enter or Space to advance after
 feedback. You can also use the on-screen buttons.
+At any point during the quiz, choose **Restart quiz** to
+immediately discard the current attempt and return to the welcome screen.
+Your saved personal best is kept.
 
 ## Tests
 

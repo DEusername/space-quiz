@@ -142,7 +142,10 @@ function loadApp({ randomValues = [] } = {}) {
     createTextNode(text) {
       return new FakeText(text);
     },
-    addEventListener() {}
+    listeners: new Map(),
+    addEventListener(type, callback) {
+      this.listeners.set(type, callback);
+    }
   };
   const values = new Map();
   const window = {
@@ -261,4 +264,64 @@ test("shuffles each quiz run and reviews missed answers against that run's quest
   assert.equal(elements.get("current-number").textContent, "1");
   assert.equal(elements.get("progress-value").style.width, "10%");
   assert.equal(vm.runInContext("missedAnswers.length", context), 0);
+});
+
+test("returns home before or after answering any question and starts a fresh quiz", () => {
+  for (let index = 0; index < 10; index += 1) {
+    for (const answer of ["unanswered", "correct", "incorrect"]) {
+      const { context, elements, document, values } = loadApp();
+      completeRun(context, [0]);
+      elements.get("review-btn").click();
+      elements.get("return-results-btn").click();
+      elements.get("restart-btn").click();
+      for (let previous = 0; previous < index; previous += 1) {
+        vm.runInContext("selectAnswer(quizQuestions[questionIndex].correct); nextButton.click()", context);
+      }
+      if (answer !== "unanswered") {
+        vm.runInContext(`selectAnswer((quizQuestions[questionIndex].correct + ${answer === "correct" ? 0 : 1}) % 4)`, context);
+      }
+
+      elements.get("return-home-btn").click();
+
+      assert.equal(elements.get("welcome-screen").classList.contains("hidden"), false);
+      for (const screen of ["quiz-screen", "result-screen", "review-screen"]) {
+        assert.equal(elements.get(screen).classList.contains("hidden"), true);
+      }
+      assert.equal(document.activeElement, elements.get("start-btn"));
+      assert.equal(vm.runInContext("questionIndex === 0 && score === 0 && !answered && quizQuestions.length === 0 && missedAnswers.length === 0", context), true);
+      assert.equal(elements.get("feedback").textContent, "");
+      assert.equal(elements.get("next-btn").classList.contains("hidden"), true);
+      assert.equal(elements.get("review-list").children.length, 0);
+      assert.match(elements.get("announcement").textContent, /Back at home/);
+      assert.equal(values.get(storageKey), "9");
+      assert.equal(elements.get("welcome-best").textContent, "9");
+
+      document.listeners.get("keydown")({ key: "1" });
+      elements.get("start-btn").click();
+      assert.equal(elements.get("current-number").textContent, "1");
+      assert.equal(elements.get("score").textContent, "0");
+      assert.equal(elements.get("progress-track").attributes.get("aria-valuenow"), "1");
+      assert.equal(elements.get("progress-value").style.width, "10%");
+      assert.equal(elements.get("answers").children.every((button) => !button.disabled), true);
+    }
+  }
+});
+
+test("quiz shortcuts do not intercept the return-home button's keyboard activation", () => {
+  for (const key of ["Enter", " "]) {
+    const { context, elements, document } = loadApp();
+    vm.runInContext("startQuiz(); selectAnswer(quizQuestions[0].correct)", context);
+    const button = elements.get("return-home-btn");
+    button.focus();
+    let prevented = false;
+    document.listeners.get("keydown")({
+      key,
+      target: button,
+      preventDefault() { prevented = true; }
+    });
+    assert.equal(prevented, false);
+    assert.equal(vm.runInContext("questionIndex", context), 0);
+    button.click();
+    assert.equal(elements.get("welcome-screen").classList.contains("hidden"), false);
+  }
 });
