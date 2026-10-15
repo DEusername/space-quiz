@@ -684,6 +684,7 @@
           <span class="pill">🚀 10 questions</span>
           <span class="pill">⏱ About 2 minutes</span>
           <span class="pill">✨ No pressure</span>
+          <span class="pill">Personal best: <strong id="welcome-best">0</strong> / 10</span>
         </div>
         <button class="primary-btn" id="start-btn" type="button">Start exploring <span aria-hidden="true">→</span></button>
       </div>
@@ -723,6 +724,7 @@
         <p class="result-copy" id="result-copy"></p>
         <p class="score-display"><span id="final-score">0</span><span> / 10</span></p>
         <div class="result-stats"><span>Correct answers</span><strong id="correct-count">0</strong></div>
+        <div class="result-stats"><span>Personal best</span><strong id="result-best">0</strong><span> / 10</span></div>
         <button class="primary-btn" id="restart-btn" type="button">Explore again <span aria-hidden="true">↻</span></button>
       </div>
     </section>
@@ -819,10 +821,26 @@
     const nextButton = document.getElementById("next-btn");
     const shortcutHint = document.getElementById("shortcut-hint");
     const announcement = document.getElementById("announcement");
+    const welcomeBest = document.getElementById("welcome-best");
+    const resultBest = document.getElementById("result-best");
+    const personalBestKey = "orbit-personal-best";
+
+    function loadPersonalBest() {
+      try {
+        const savedBest = window.localStorage.getItem(personalBestKey);
+        const best = Number(savedBest);
+        return savedBest !== null && Number.isInteger(best) && best >= 0 && best <= questions.length ? best : 0;
+      } catch {
+        return 0;
+      }
+    }
 
     let questionIndex = 0;
     let score = 0;
+    let personalBest = loadPersonalBest();
     let answered = false;
+
+    welcomeBest.textContent = personalBest;
 
     function showScreen(screen) {
       [welcomeScreen, quizScreen, resultScreen].forEach((item) => item.classList.add("hidden"));
@@ -906,6 +924,17 @@
     }
 
     function showResults() {
+      if (score > personalBest) {
+        personalBest = score;
+      }
+      try {
+        window.localStorage.setItem(personalBestKey, personalBest);
+      } catch {
+        // Keep the current session usable when browser storage is disabled.
+      }
+      welcomeBest.textContent = personalBest;
+      resultBest.textContent = personalBest;
+
       const reactions = [
         { min: 0, emoji: "🛰️", title: "Mission accomplished!", copy: "Every explorer starts with a little curiosity. Keep looking up!" },
         { min: 3, emoji: "🌙", title: "Nice work, stargazer!", copy: "You've got a growing universe of space facts in your orbit." },
