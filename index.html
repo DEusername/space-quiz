@@ -881,6 +881,7 @@
         explanation: "The event horizon marks the point of no return. The singularity is a different concept: the black hole's central region."
       }
     ];
+    let quizQuestions = [];
 
     const welcomeScreen = document.getElementById("welcome-screen");
     const quizScreen = document.getElementById("quiz-screen");
@@ -933,6 +934,11 @@
       questionIndex = 0;
       score = 0;
       missedAnswers = [];
+      quizQuestions = [...questions];
+      for (let index = quizQuestions.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [quizQuestions[index], quizQuestions[swapIndex]] = [quizQuestions[swapIndex], quizQuestions[index]];
+      }
       scoreDisplay.textContent = score;
       showScreen(quizScreen);
       renderQuestion();
@@ -940,10 +946,10 @@
 
     function renderQuestion() {
       answered = false;
-      const item = questions[questionIndex];
+      const item = quizQuestions[questionIndex];
       currentNumber.textContent = questionIndex + 1;
       progressTrack.setAttribute("aria-valuenow", questionIndex + 1);
-      progressValue.style.width = `${((questionIndex + 1) / questions.length) * 100}%`;
+      progressValue.style.width = `${((questionIndex + 1) / quizQuestions.length) * 100}%`;
       questionCategory.textContent = item.category;
       questionText.textContent = item.question;
       answersContainer.replaceChildren();
@@ -968,7 +974,7 @@
     function selectAnswer(selectedIndex) {
       if (answered) return;
       answered = true;
-      const item = questions[questionIndex];
+      const item = quizQuestions[questionIndex];
       const buttons = [...answersContainer.querySelectorAll(".answer")];
       const isCorrect = selectedIndex === item.correct;
 
@@ -999,7 +1005,7 @@
       announcement.textContent = isCorrect
         ? `Correct. Score: ${score} out of ${questionIndex + 1}. ${item.explanation}`
         : `Incorrect. ${item.explanation}`;
-      nextButton.innerHTML = questionIndex === questions.length - 1
+      nextButton.innerHTML = questionIndex === quizQuestions.length - 1
         ? 'See your results <span aria-hidden="true">→</span>'
         : 'Next question <span aria-hidden="true">→</span>';
       nextButton.classList.remove("hidden");
@@ -1041,7 +1047,7 @@
       reviewIntro.textContent = `${missedAnswers.length} question${missedAnswers.length === 1 ? "" : "s"} to learn from.`;
       reviewList.replaceChildren();
       missedAnswers.forEach(({ questionIndex: missedIndex, selectedIndex }) => {
-        const item = questions[missedIndex];
+        const item = quizQuestions[missedIndex];
         const listItem = document.createElement("li");
         listItem.className = "review-item";
 
@@ -1083,7 +1089,7 @@
     reviewButton.addEventListener("click", showReview);
     returnResultsButton.addEventListener("click", returnToResults);
     nextButton.addEventListener("click", () => {
-      if (questionIndex < questions.length - 1) {
+      if (questionIndex < quizQuestions.length - 1) {
         questionIndex += 1;
         renderQuestion();
       } else {
