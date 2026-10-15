@@ -560,6 +560,71 @@
 
     .result-stats strong { color: var(--text); }
 
+    .review {
+      padding: 34px;
+    }
+
+    .review h2 {
+      margin-bottom: 8px;
+      font-size: 30px;
+    }
+
+    .review-intro {
+      margin-bottom: 22px;
+      color: var(--muted);
+    }
+
+    .review-list {
+      display: grid;
+      gap: 14px;
+      margin: 0 0 24px;
+      padding: 0;
+      list-style: none;
+      text-align: left;
+    }
+
+    .review-item {
+      padding: 17px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--surface-solid);
+    }
+
+    .review-question {
+      margin-bottom: 12px;
+      font-weight: 700;
+    }
+
+    .review-answer,
+    .review-explanation {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .review-answer strong {
+      color: var(--text);
+    }
+
+    .review-answer.is-selected strong {
+      color: var(--wrong);
+    }
+
+    .review-answer.is-correct strong {
+      color: var(--correct);
+    }
+
+    .review-explanation {
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+    }
+
+    .review-return {
+      width: auto;
+      min-width: 160px;
+    }
+
     .text-btn {
       display: inline-flex;
       align-items: center;
@@ -636,6 +701,7 @@
       .progress-track { margin-bottom: 25px; }
       .answer { min-height: 55px; }
       .shortcut-hint { max-width: 140px; }
+      .review { padding: 25px 20px; }
     }
 
     @media (max-width: 360px) {
@@ -725,7 +791,16 @@
         <p class="score-display"><span id="final-score">0</span><span> / 10</span></p>
         <div class="result-stats"><span>Correct answers</span><strong id="correct-count">0</strong></div>
         <div class="result-stats"><span>Personal best</span><strong id="result-best">0</strong><span> / 10</span></div>
+        <button class="primary-btn hidden" id="review-btn" type="button"></button>
         <button class="primary-btn" id="restart-btn" type="button">Explore again <span aria-hidden="true">↻</span></button>
+      </div>
+
+      <div class="screen review hidden" id="review-screen">
+        <p class="eyebrow">Learn from your orbit</p>
+        <h2 id="review-title" tabindex="-1">Review your missed answers</h2>
+        <p class="review-intro" id="review-intro"></p>
+        <ol class="review-list" id="review-list" aria-label="Missed questions"></ol>
+        <button class="primary-btn review-return" id="return-results-btn" type="button">Back to results</button>
       </div>
     </section>
 
@@ -810,6 +885,7 @@
     const welcomeScreen = document.getElementById("welcome-screen");
     const quizScreen = document.getElementById("quiz-screen");
     const resultScreen = document.getElementById("result-screen");
+    const reviewScreen = document.getElementById("review-screen");
     const currentNumber = document.getElementById("current-number");
     const progressTrack = document.getElementById("progress-track");
     const progressValue = document.getElementById("progress-value");
@@ -823,6 +899,11 @@
     const announcement = document.getElementById("announcement");
     const welcomeBest = document.getElementById("welcome-best");
     const resultBest = document.getElementById("result-best");
+    const reviewButton = document.getElementById("review-btn");
+    const reviewTitle = document.getElementById("review-title");
+    const reviewIntro = document.getElementById("review-intro");
+    const reviewList = document.getElementById("review-list");
+    const returnResultsButton = document.getElementById("return-results-btn");
     const personalBestKey = "orbit-personal-best";
 
     function loadPersonalBest() {
@@ -837,19 +918,21 @@
 
     let questionIndex = 0;
     let score = 0;
+    let missedAnswers = [];
     let personalBest = loadPersonalBest();
     let answered = false;
 
     welcomeBest.textContent = personalBest;
 
     function showScreen(screen) {
-      [welcomeScreen, quizScreen, resultScreen].forEach((item) => item.classList.add("hidden"));
+      [welcomeScreen, quizScreen, resultScreen, reviewScreen].forEach((item) => item.classList.add("hidden"));
       screen.classList.remove("hidden");
     }
 
     function startQuiz() {
       questionIndex = 0;
       score = 0;
+      missedAnswers = [];
       scoreDisplay.textContent = score;
       showScreen(quizScreen);
       renderQuestion();
@@ -908,6 +991,7 @@
         feedback.classList.add("is-correct");
         feedback.innerHTML = `<strong>Brilliant, that's right!</strong> ${item.explanation}`;
       } else {
+        missedAnswers.push({ questionIndex, selectedIndex });
         feedback.classList.add("is-wrong");
         feedback.innerHTML = `<strong>Not quite!</strong> ${item.explanation}`;
       }
@@ -934,6 +1018,8 @@
       }
       welcomeBest.textContent = personalBest;
       resultBest.textContent = personalBest;
+      reviewButton.classList.toggle("hidden", missedAnswers.length === 0);
+      reviewButton.textContent = `Review ${missedAnswers.length} missed answer${missedAnswers.length === 1 ? "" : "s"}`;
 
       const reactions = [
         { min: 0, emoji: "🛰️", title: "Mission accomplished!", copy: "Every explorer starts with a little curiosity. Keep looking up!" },
@@ -951,8 +1037,51 @@
       document.getElementById("restart-btn").focus({ preventScroll: true });
     }
 
+    function showReview() {
+      reviewIntro.textContent = `${missedAnswers.length} question${missedAnswers.length === 1 ? "" : "s"} to learn from.`;
+      reviewList.replaceChildren();
+      missedAnswers.forEach(({ questionIndex: missedIndex, selectedIndex }) => {
+        const item = questions[missedIndex];
+        const listItem = document.createElement("li");
+        listItem.className = "review-item";
+
+        const question = document.createElement("p");
+        question.className = "review-question";
+        question.textContent = `Question ${missedIndex + 1}: ${item.question}`;
+
+        const selectedAnswer = document.createElement("p");
+        selectedAnswer.className = "review-answer is-selected";
+        const selectedLabel = document.createElement("strong");
+        selectedLabel.textContent = "Your answer: ";
+        selectedAnswer.append(selectedLabel, document.createTextNode(item.answers[selectedIndex]));
+
+        const correctAnswer = document.createElement("p");
+        correctAnswer.className = "review-answer is-correct";
+        const correctLabel = document.createElement("strong");
+        correctLabel.textContent = "Correct answer: ";
+        correctAnswer.append(correctLabel, document.createTextNode(item.answers[item.correct]));
+
+        const explanation = document.createElement("p");
+        explanation.className = "review-explanation";
+        explanation.textContent = item.explanation;
+
+        listItem.append(question, selectedAnswer, correctAnswer, explanation);
+        reviewList.append(listItem);
+      });
+      showScreen(reviewScreen);
+      reviewTitle.focus({ preventScroll: true });
+      announcement.textContent = `Reviewing ${missedAnswers.length} missed question${missedAnswers.length === 1 ? "" : "s"}.`;
+    }
+
+    function returnToResults() {
+      showScreen(resultScreen);
+      reviewButton.focus({ preventScroll: true });
+    }
+
     document.getElementById("start-btn").addEventListener("click", startQuiz);
     document.getElementById("restart-btn").addEventListener("click", startQuiz);
+    reviewButton.addEventListener("click", showReview);
+    returnResultsButton.addEventListener("click", returnToResults);
     nextButton.addEventListener("click", () => {
       if (questionIndex < questions.length - 1) {
         questionIndex += 1;
