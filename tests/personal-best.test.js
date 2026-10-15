@@ -15,7 +15,13 @@ class Element {
     this.classList = {
       add: (...names) => names.forEach((name) => classes.add(name)),
       remove: (...names) => names.forEach((name) => classes.delete(name)),
-      contains: (name) => classes.has(name)
+      contains: (name) => classes.has(name),
+      toggle: (name, force) => {
+        const shouldAdd = force ?? !classes.has(name);
+        if (shouldAdd) classes.add(name);
+        else classes.delete(name);
+        return shouldAdd;
+      }
     };
   }
 
