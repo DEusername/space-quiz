@@ -128,7 +128,7 @@ class FakeElement {
   }
 }
 
-function loadApp() {
+function loadApp({ randomValues = [] } = {}) {
   const elements = new Map();
   const document = {
     activeElement: null,
@@ -152,23 +152,35 @@ function loadApp() {
     }
   };
   const context = vm.createContext({ document, window });
+  vm.runInContext(`
+    const randomValues = ${JSON.stringify(randomValues)};
+    let randomIndex = 0;
+    Math.random = () => randomValues[randomIndex++] ?? 0.999999;
+  `, context);
   vm.runInContext(script, context);
   return { context, document, elements, values };
 }
 
-function completeRun(context, missedQuestionIndexes) {
-  vm.runInContext(`
-    startQuiz();
+function answerQuiz(context, missedQuestionIndexes) {
+  return JSON.parse(vm.runInContext(`
     const missed = new Set(${JSON.stringify(missedQuestionIndexes)});
-    for (let index = 0; index < questions.length; index += 1) {
-      const item = questions[questionIndex];
+    const shownQuestions = [];
+    for (let index = 0; index < quizQuestions.length; index += 1) {
+      const item = quizQuestions[questionIndex];
+      shownQuestions.push(questionText.textContent);
       const selectedIndex = missed.has(questionIndex)
         ? (item.correct + 1) % item.answers.length
         : item.correct;
       answersContainer.children[selectedIndex].click();
       nextButton.click();
     }
-  `, context);
+    JSON.stringify(shownQuestions);
+  `, context));
+}
+
+function completeRun(context, missedQuestionIndexes) {
+  vm.runInContext("startQuiz()", context);
+  return answerQuiz(context, missedQuestionIndexes);
 }
 
 test("reviews only missed answers with the chosen answer, correct answer, and explanation", () => {
@@ -220,4 +232,33 @@ test("returns to the unchanged results after reviewing missed answers", () => {
     best: elements.get("result-best").textContent,
     storedBest: values.get(storageKey)
   }, before);
+});
+
+test("shuffles each quiz run and reviews missed answers against that run's questions", () => {
+  const randomValues = [...Array(9).fill(0), ...Array(9).fill(0.999999)];
+  const { context, elements } = loadApp({ randomValues });
+  const sourceQuestions = JSON.parse(vm.runInContext("JSON.stringify(questions)", context));
+
+  elements.get("start-btn").click();
+  const firstOrder = answerQuiz(context, [0]);
+  assert.equal(new Set(firstOrder).size, sourceQuestions.length);
+  assert.deepEqual(firstOrder, sourceQuestions.map((question) => question.question).slice(1).concat(sourceQuestions[0].question));
+
+  const missedItem = JSON.parse(vm.runInContext("JSON.stringify(quizQuestions[0])", context));
+  elements.get("review-btn").click();
+  const reviewText = elements.get("review-list").children[0].textContent;
+  assert.match(reviewText, new RegExp(missedItem.question.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(reviewText, new RegExp(`Your answer: ${missedItem.answers[(missedItem.correct + 1) % missedItem.answers.length]}`));
+  assert.match(reviewText, new RegExp(`Correct answer: ${missedItem.answers[missedItem.correct]}`));
+  assert.match(reviewText, new RegExp(missedItem.explanation.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+
+  elements.get("restart-btn").click();
+  const secondOrder = JSON.parse(vm.runInContext("JSON.stringify(quizQuestions.map((question) => question.question))", context));
+  assert.deepEqual(secondOrder, sourceQuestions.map((question) => question.question));
+  assert.notDeepEqual(secondOrder, firstOrder);
+  assert.equal(elements.get("question-text").textContent, secondOrder[0]);
+  assert.equal(elements.get("score").textContent, "0");
+  assert.equal(elements.get("current-number").textContent, "1");
+  assert.equal(elements.get("progress-value").style.width, "10%");
+  assert.equal(vm.runInContext("missedAnswers.length", context), 0);
 });
