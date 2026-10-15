@@ -297,7 +297,7 @@
     }
 
     .primary-btn:active { transform: translateY(0); }
-    .primary-btn:focus-visible, .answer:focus-visible, .text-btn:focus-visible {
+    .primary-btn:focus-visible, .answer:focus-visible, .secondary-btn:focus-visible {
       outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent);
       outline-offset: 3px;
     }
@@ -472,18 +472,18 @@
     .feedback strong { font-weight: 750; }
 
     .quiz-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: stretch;
       gap: 12px;
       margin-top: 21px;
     }
 
-    .shortcut-hint { color: var(--muted); font-size: 12px; }
+    .shortcut-hint { align-self: center; color: var(--muted); font-size: 12px; }
 
     .next-btn {
       width: auto;
-      min-width: 148px;
+      min-width: 0;
       min-height: 46px;
       padding: 10px 16px;
       border-radius: 12px;
@@ -625,21 +625,33 @@
       min-width: 160px;
     }
 
-    .text-btn {
+    .secondary-btn {
+      width: 100%;
+      min-height: 46px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      padding: 10px;
-      border: 0;
-      color: var(--muted);
-      background: transparent;
+      padding: 10px 16px;
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      color: var(--accent);
+      background: var(--accent-soft);
       cursor: pointer;
       font-size: 13px;
       font-weight: 650;
+      transition: background .18s ease, box-shadow .18s ease;
     }
 
-    .text-btn:hover { color: var(--accent); }
+    .secondary-btn:hover {
+      background: color-mix(in srgb, var(--accent) 18%, var(--surface-solid));
+      box-shadow: 0 3px 10px color-mix(in srgb, var(--accent) 15%, transparent);
+    }
+
+    .secondary-btn:active {
+      background: color-mix(in srgb, var(--accent) 25%, var(--surface-solid));
+      box-shadow: none;
+    }
 
     .bottom-note {
       margin: 16px 0 0;
@@ -780,6 +792,7 @@
         <div class="quiz-footer">
           <span class="shortcut-hint" id="shortcut-hint">Tip: press 1–4 to choose</span>
           <button class="primary-btn next-btn hidden" id="next-btn" type="button">Next question <span aria-hidden="true">→</span></button>
+          <button class="secondary-btn" id="return-home-btn" type="button">Restart quiz</button>
         </div>
       </div>
 
@@ -930,16 +943,34 @@
       screen.classList.remove("hidden");
     }
 
-    function startQuiz() {
+    function resetQuiz() {
       questionIndex = 0;
       score = 0;
       missedAnswers = [];
+      quizQuestions = [];
+      answered = false;
+      scoreDisplay.textContent = score;
+      feedback.textContent = "";
+      feedback.className = "feedback";
+      nextButton.classList.add("hidden");
+      announcement.textContent = "";
+      reviewList.replaceChildren();
+    }
+
+    function returnHome() {
+      resetQuiz();
+      showScreen(welcomeScreen);
+      document.getElementById("start-btn").focus({ preventScroll: true });
+      announcement.textContent = "Quiz reset. Back at home. Start exploring to begin a new quiz.";
+    }
+
+    function startQuiz() {
+      resetQuiz();
       quizQuestions = [...questions];
       for (let index = quizQuestions.length - 1; index > 0; index -= 1) {
         const swapIndex = Math.floor(Math.random() * (index + 1));
         [quizQuestions[index], quizQuestions[swapIndex]] = [quizQuestions[swapIndex], quizQuestions[index]];
       }
-      scoreDisplay.textContent = score;
       showScreen(quizScreen);
       renderQuestion();
     }
@@ -1086,6 +1117,7 @@
 
     document.getElementById("start-btn").addEventListener("click", startQuiz);
     document.getElementById("restart-btn").addEventListener("click", startQuiz);
+    document.getElementById("return-home-btn").addEventListener("click", returnHome);
     reviewButton.addEventListener("click", showReview);
     returnResultsButton.addEventListener("click", returnToResults);
     nextButton.addEventListener("click", () => {
@@ -1099,6 +1131,7 @@
 
     document.addEventListener("keydown", (event) => {
       if (quizScreen.classList.contains("hidden")) return;
+      if (event.target === document.getElementById("return-home-btn")) return;
       if (!answered && /^[1-4]$/.test(event.key)) {
         selectAnswer(Number(event.key) - 1);
       } else if (answered && (event.key === "Enter" || event.key === " ")) {
